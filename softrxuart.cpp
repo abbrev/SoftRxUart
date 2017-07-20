@@ -46,9 +46,10 @@
  * when it overflows to 0 or positive.
  *
  * This uses bit_counter to tell us the current sampling state:
- *      bit_counter  = 10: reading start bit
- * 2 <= bit_counter <=  9: reading data bit
- *      bit_counter  =  1: reading/expecting stop bit
+ *      bit_counter  = 11: reading start bit
+ * 3 <= bit_counter <= 10: reading data bit
+ *      bit_counter  =  2: expecting stop bit
+ *      bit_counter  =  1: waiting for stop bit
  *      bit_counter  =  0: waiting for start bit
  *
  * If bit_counter is not 0, it's decremented each bit time.
@@ -100,10 +101,17 @@ SoftRxUart::SoftRxUart(uint32_t bit_rate, uint32_t int_rate)
 
 void SoftRxUart::sample(uint8_t pin_state) {
 	if (bit_counter == 0) {
+		// waiting for start bit
 		if (pin_state == 0) {
 			// leading edge of start bit
-			bit_counter = 8 + 2;
+			bit_counter = 8 + 3;
 			bit_sample_timer = -((uint8_t)(int_rate_ - bit_rate_) / 2);
+		}
+	} else if (bit_counter == 1) {
+		// waiting for stop bit
+		if (pin_state != 0) {
+			// we got the stop bit
+			--bit_counter;
 		}
 	} else {
 		/*
@@ -114,12 +122,14 @@ void SoftRxUart::sample(uint8_t pin_state) {
 			bit_sample_timer -= int_rate_;
 			// it's bit time!
 			uint8_t d = data;
-			if (--bit_counter == 0) {
+			if (--bit_counter == 1) {
 				// this should be the stop bit
 				if (pin_state == 0) {
 					// framing error
 					// TODO do something to tell the
 					// application about this
+				} else {
+					--bit_counter;
 				}
 				rxq.enqueue(d);
 				// TODO if receive queue is nearly full, do
