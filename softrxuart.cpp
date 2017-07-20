@@ -103,7 +103,7 @@ void SoftRxUart::sample(uint8_t pin_state) {
 		if (pin_state == 0) {
 			// leading edge of start bit
 			bit_counter = 8 + 2;
-			bit_sample_timer = -(int_rate_ / 2);
+			bit_sample_timer = -((uint8_t)(int_rate_ - bit_rate_) / 2);
 		}
 	} else {
 		/*
